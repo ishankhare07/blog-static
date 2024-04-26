@@ -13,8 +13,8 @@ published = "Jan 02, 2006"
 lastUpdated = "Jan 02, 2006 15:04 MST"
 
 [sidebar]
-emoji = "🍥"
-subtitle = "Lorem ipsum dolor sit amet, consectetur adipiscing elit."
+emoji = "😎"
+subtitle = "Senior Software Engineer | Cloud Native | kubernetes | go | AI"
 
 [sidebar.avatar]
 enabled = true
@@ -27,7 +27,7 @@ readingTime = true
 
 [article.license]
 enabled = true
-default = "Licensed under CC BY-NC-SA 4.0"
+default = "MIT"
 
 ## Widgets
 [[widgets.homepage]]
@@ -55,7 +55,7 @@ limit = 10
 type = "toc"
 
 [opengraph.twitter]
-site = ""
+site = "https://twitter.com/ishankhare07"
 card = "summary_large_image"
 
 [defaultImage.opengraph]
