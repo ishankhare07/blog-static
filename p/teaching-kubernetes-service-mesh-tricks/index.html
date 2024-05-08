@@ -1,0 +1,885 @@
+<!doctype html><html lang=en-us dir=ltr><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><meta name=description content="This post in general is about how we can leverage kubernetes controllers and the kubernetes resource model to automate and manage heavy lifting of tricky deployment and management scenarios."><title>Teaching kubernetes service mesh tricks</title>
+<link rel=canonical href=https://ishankhare.dev/p/teaching-kubernetes-service-mesh-tricks/><link rel=stylesheet href=/scss/style.min.0304c6baf04e01a8fe70693791cb744d56a3578a3120a8796cefc66825aa39c7.css><meta property='og:title' content="Teaching kubernetes service mesh tricks"><meta property='og:description' content="This post in general is about how we can leverage kubernetes controllers and the kubernetes resource model to automate and manage heavy lifting of tricky deployment and management scenarios."><meta property='og:url' content='https://ishankhare.dev/p/teaching-kubernetes-service-mesh-tricks/'><meta property='og:site_name' content='Ishan Khare'><meta property='og:type' content='article'><meta property='article:section' content='Post'><meta property='article:tag' content='kubernetes'><meta property='article:tag' content='controllers'><meta property='article:tag' content='servicemesh'><meta property='article:tag' content='golang'><meta property='article:published_time' content='2021-03-02T00:00:00+00:00'><meta property='article:modified_time' content='2021-03-02T00:00:00+00:00'><meta property='og:image' content='https://ishankhare.dev/p/teaching-kubernetes-service-mesh-tricks/brahmaputra.jpg'><meta name=twitter:site content="@https://twitter.com/ishankhare07"><meta name=twitter:creator content="@https://twitter.com/ishankhare07"><meta name=twitter:title content="Teaching kubernetes service mesh tricks"><meta name=twitter:description content="This post in general is about how we can leverage kubernetes controllers and the kubernetes resource model to automate and manage heavy lifting of tricky deployment and management scenarios."><meta name=twitter:card content="summary_large_image"><meta name=twitter:image content='https://ishankhare.dev/p/teaching-kubernetes-service-mesh-tricks/brahmaputra.jpg'><link rel="shortcut icon" href=/favicon.png></head><body class=article-page><script>(function(){const e="StackColorScheme";localStorage.getItem(e)||localStorage.setItem(e,"auto")})()</script><script>(function(){const t="StackColorScheme",e=localStorage.getItem(t),n=window.matchMedia("(prefers-color-scheme: dark)").matches===!0;e=="dark"||e==="auto"&&n?document.documentElement.dataset.scheme="dark":document.documentElement.dataset.scheme="light"})()</script><div class="container main-container flex on-phone--column extended"><aside class="sidebar left-sidebar sticky"><button class="hamburger hamburger--spin" type=button id=toggle-menu aria-label="Toggle Menu">
+<span class=hamburger-box><span class=hamburger-inner></span></span></button><header><figure class=site-avatar><a href=/><img src=/img/avatar_hu8020bdaeac997584d241415dc4f6c363_232442_300x0_resize_box_3.png width=300 height=300 class=site-logo loading=lazy alt=Avatar>
+</a><span class=emoji>😎</span></figure><div class=site-meta><h1 class=site-name><a href=/>Ishan Khare</a></h1><h2 class=site-description>Senior Software Engineer | Cloud Native | kubernetes | go | AI</h2></div></header><ol class=menu-social><li><a href=https://github.com/ishankhare07 target=_blank title=GitHub rel=me><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-github" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 19c-4.3 1.4-4.3-2.5-6-3m12 5v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6.0 00-1.3-3.2 4.2 4.2.0 00-.1-3.2s-1.1-.3-3.5 1.3a12.3 12.3.0 00-6.2.0C6.5 2.8 5.4 3.1 5.4 3.1a4.2 4.2.0 00-.1 3.2A4.6 4.6.0 004 9.5c0 4.6 2.7 5.7 5.5 6-.6.6-.6 1.2-.5 2V21"/></svg></a></li><li><a href=https://twitter.com/ishankhare07 target=_blank title=Twitter rel=me><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-brand-twitter" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M22 4.01c-1 .49-1.98.689-3 .99-1.121-1.265-2.783-1.335-4.38-.737S11.977 6.323 12 8v1c-3.245.083-6.135-1.395-8-4 0 0-4.182 7.433 4 11-1.872 1.247-3.739 2.088-6 2 3.308 1.803 6.913 2.423 10.034 1.517 3.58-1.04 6.522-3.723 7.651-7.742a13.84 13.84.0 00.497-3.753C20.18 7.773 21.692 5.25 22 4.009z"/></svg></a></li></ol><ol class=menu id=main-menu><li><a href=/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-home" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><polyline points="5 12 3 12 12 3 21 12 19 12"/><path d="M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7"/><path d="M9 21v-6a2 2 0 012-2h2a2 2 0 012 2v6"/></svg>
+<span>Home</span></a></li><li><a href=/archives/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-archive" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><rect x="3" y="4" width="18" height="4" rx="2"/><path d="M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+<span>Archives</span></a></li><li><a href=/search/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-search" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg>
+<span>Search</span></a></li><li><a href=/links/><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-link" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M10 14a3.5 3.5.0 005 0l4-4a3.5 3.5.0 00-5-5l-.5.5"/><path d="M14 10a3.5 3.5.0 00-5 0l-4 4a3.5 3.5.0 005 5l.5-.5"/></svg>
+<span>Links</span></a></li><li class=menu-bottom-section><ol class=menu><li id=dark-mode-toggle><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-left" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="8" cy="12" r="2"/><rect x="2" y="6" width="20" height="12" rx="6"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-toggle-right" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="16" cy="12" r="2"/><rect x="2" y="6" width="20" height="12" rx="6"/></svg>
+<span>Dark Mode</span></li></ol></li></ol></aside><aside class="sidebar right-sidebar sticky"><section class="widget archives"><div class=widget-icon><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-hash" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/><line x1="11" y1="4" x2="7" y2="20"/><line x1="17" y1="4" x2="13" y2="20"/></svg></div><h2 class="widget-title section-title">Table of contents</h2><div class=widget--toc><nav id=TableOfContents><ol><li><a href=#what-well-cover-in-this-post>What we&rsquo;ll cover in this post?</a></li><li><a href=#tldr>Tl;Dr</a></li><li><a href=#use-case>Use case</a></li><li><a href=#the-deep-dive>The Deep Dive</a><ol><li><a href=#the-crd>The CRD</a></li><li><a href=#the-controller>The controller</a></li><li><a href=#the-virtualservice-check>The VirtualService check</a></li><li><a href=#the-destinationrule-check>The DestinationRule check</a></li><li><a href=#creating-the-istio-crds-defining-the-spawn-package>Creating the Istio CRD&rsquo;s (defining the &lsquo;spawn&rsquo;) package</a></li><li><a href=#telling-the-controller-to-watch-the-resources-we-own>Telling the controller to &lsquo;watch&rsquo; the resources we own</a></li><li><a href=#are-we-done>Are we done?</a></li><li><a href=#some-final-highlights>Some final highlights</a></li><li><a href=#whats-next>What&rsquo;s next?</a></li></ol></li></ol></nav></div></section></aside><main class="main full-width"><article class="has-image main-article"><header class=article-header><div class=article-image><a href=/p/teaching-kubernetes-service-mesh-tricks/><img src=/p/teaching-kubernetes-service-mesh-tricks/brahmaputra_huc7cb4a692ba86d21dca6ace88275abce_1697843_800x0_resize_q75_box.jpg srcset="/p/teaching-kubernetes-service-mesh-tricks/brahmaputra_huc7cb4a692ba86d21dca6ace88275abce_1697843_800x0_resize_q75_box.jpg 800w, /p/teaching-kubernetes-service-mesh-tricks/brahmaputra_huc7cb4a692ba86d21dca6ace88275abce_1697843_1600x0_resize_q75_box.jpg 1600w" width=800 height=404 loading=lazy alt="Featured image of post Teaching kubernetes service mesh tricks"></a></div><div class=article-details><header class=article-category><a href=/categories/servicemesh/>Servicemesh
+</a><a href=/categories/controllers/>Controllers
+</a><a href=/categories/kubernetes/>Kubernetes
+</a><a href=/categories/go/>Go</a></header><div class=article-title-wrapper><h2 class=article-title><a href=/p/teaching-kubernetes-service-mesh-tricks/>Teaching kubernetes service mesh tricks</a></h2><h3 class=article-subtitle>This post in general is about how we can leverage kubernetes controllers and the kubernetes resource model to automate and manage heavy lifting of tricky deployment and management scenarios.</h3></div><footer class=article-time><div><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-calendar-time" width="56" height="56" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M11.795 21H5a2 2 0 01-2-2V7a2 2 0 012-2h12a2 2 0 012 2v4"/><circle cx="18" cy="18" r="4"/><path d="M15 3v4"/><path d="M7 3v4"/><path d="M3 11h16"/><path d="M18 16.496V18l1 1"/></svg>
+<time class=article-time--published>Mar 02, 2021</time></div><div><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+<time class=article-time--reading>15 minute read</time></div></footer></div></header><section class=article-content><h2 id=what-well-cover-in-this-post>What we&rsquo;ll cover in this post?</h2><p>This post in general is about how we can leverage kubernetes controllers and the <a class=link href=https://github.com/kubernetes/community/blob/master/contributors/design-proposals/architecture/resource-management.md target=_blank rel=noopener>kubernetes resource model</a> to automate and manage heavy lifting of tricky deployment and management scenarios.</p><p>Controller are often explained in layman terms as <em>software-SRE&rsquo;s</em>. The good thing about that is:</p><ul><li>They are always available and ready to step in when things go wrong.</li><li>They have all the operational logic in the form of code related to the steps to take when certain things don&rsquo;t work.</li><li>They don&rsquo;t need to go over runbooks/playbooks or other documentations to fix issues.</li><li>Since they are always watching resources and their states (as we&rsquo;ll see later in this post), they don&rsquo;t have to spend time
+to <em>find</em> where the errors/misconfiguration happened.</li></ul><p>This can give us a few positive outcomes:</p><ul><li>Humans don&rsquo;t have to be on hectic on-call schedules.</li><li>In cases of errors, the software itself is healing the system, hence the MTTR(mean time to response) is considerably decreased.</li></ul><blockquote><p>&ldquo;With great power comes great responsibilities&rdquo;. With all the advantages of implementing controllers, they also come with high cost of implementation details.
+Implementing controllers is generally more complex than traditional systems.</p></blockquote><p>Now that we know a bit about controllers, we&rsquo;ll take a use case and try to implement a controller to solve it.</p><h2 id=tldr>Tl;Dr</h2><p>If you want to directly go ahead and checkout the code implementation and test it on your local machine, I have the entire thing residing
+in this – <a class=link href=https://github.com/ishankhare07/launchpad target=_blank rel=noopener>github.com/ishankhare07/launchpad</a> repo. There is a detailed readme which walks you through
+a Makefile that:</p><ul><li>Sets up a local kind cluster</li><li>Installs Istio on it</li><li>Deploys demo workloads(Deployments)</li><li>Applies the right Istio CRD&rsquo;s – a <code>VirtualService</code> and a <code>DestinationRule</code> to achieve a traffic split.</li><li>Check and verify the traffic split.</li></ul><p>It then also walks you through the controller way of doing things and also the magic of <em>Software-SRE&rsquo;s</em> that they bring along.</p><h2 id=use-case>Use case</h2><p>The use case we are trying to tackle here is doing a traffic split using a a service mesh. Since this blog post can only have limited scope, what we will NOT talk about is:</p><ul><li>Service mesh in general or service mesh comparison. We&rsquo;ll just go ahead and use Istio.</li><li>We&rsquo;ll not go into the details of how Istio or any other service mesh works.</li></ul><p>The specific scenario we would want to cover is a <code>Traffic Split</code>/<code>Canary</code>. More details can be found by giving a look at this awesome example site – <a class=link href=https://www.istiobyexample.dev/canary target=_blank rel=noopener>istiobyexample.dev/canary</a> – by <a class=link href=https://twitter.com/askmeegs target=_blank rel=noopener>@askmeegs</a>. Borrowing the following screenshot from that same article, demonstrating what we want to achieve:</p><p><img src=/p/teaching-kubernetes-service-mesh-tricks/canary_deployments.png width=1590 height=879 srcset="/p/teaching-kubernetes-service-mesh-tricks/canary_deployments_hu303efb2a6365798a0ff6e6c5320a1896_92868_480x0_resize_box_3.png 480w, /p/teaching-kubernetes-service-mesh-tricks/canary_deployments_hu303efb2a6365798a0ff6e6c5320a1896_92868_1024x0_resize_box_3.png 1024w" loading=lazy alt="Canary Deplyments" class=gallery-image data-flex-grow=180 data-flex-basis=434px></p><p>The page also details how we can achieve this by creating Istio specific CRD&rsquo;s. We&rsquo;ll look at both the approaches and see the advantages first-hand where controllers come in.</p><p>Below are the Istio CRD&rsquo;s that we would want to create in the cluster in order for Istio to do things for us:<br><code>DestinationRule</code></p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-yaml data-lang=yaml><span class=line><span class=cl><span class=nt>apiVersion</span><span class=p>:</span><span class=w> </span><span class=l>networking.istio.io/v1alpha3</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>kind</span><span class=p>:</span><span class=w> </span><span class=l>DestinationRule</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>metadata</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>helloworld</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>spec</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>host</span><span class=p>:</span><span class=w> </span><span class=l>helloworld</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>subsets</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>v1</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>labels</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>version</span><span class=p>:</span><span class=w> </span><span class=l>v1</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>v2</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>labels</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>version</span><span class=p>:</span><span class=w> </span><span class=l>v2</span><span class=w>
+</span></span></span></code></pre></td></tr></table></div></div><p><code>VirtualService</code></p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-yaml data-lang=yaml><span class=line><span class=cl><span class=nt>apiVersion</span><span class=p>:</span><span class=w> </span><span class=l>networking.istio.io/v1alpha3</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>kind</span><span class=p>:</span><span class=w> </span><span class=l>VirtualService</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>metadata</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>helloworld</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>spec</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>hosts</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span>- <span class=l>helloworld</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>http</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span>- <span class=nt>route</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=nt>destination</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>host</span><span class=p>:</span><span class=w> </span><span class=l>helloworld</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>subset</span><span class=p>:</span><span class=w> </span><span class=l>v1</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>weight</span><span class=p>:</span><span class=w> </span><span class=m>80</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=nt>destination</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>host</span><span class=p>:</span><span class=w> </span><span class=l>helloworld</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>subset</span><span class=p>:</span><span class=w> </span><span class=l>v2</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>weight</span><span class=p>:</span><span class=w> </span><span class=m>20</span><span class=w>
+</span></span></span></code></pre></td></tr></table></div></div><p>Too much going around the core of this post, lets dive in now.</p><hr><blockquote><p>This post uses the awesome <a class=link href=https://github.com/kubernetes-sigs/kubebuilder target=_blank rel=noopener>kubebuilder</a> framework for implementing the controller. If you&rsquo;re unfamiliar about it and want an intro
+I&rsquo;ve written a previous article about it on my blog which you can read here – <a class=link href=https://ishankhare.dev/posts/6/ target=_blank rel=noopener>Writing a kubernetes controller in Go with kubebuilder</a></p></blockquote><hr><h2 id=the-deep-dive>The Deep Dive</h2><p><img src=/p/teaching-kubernetes-service-mesh-tricks/IMG_20190824_143526709.jpg width=4608 height=3456 srcset="/p/teaching-kubernetes-service-mesh-tricks/IMG_20190824_143526709_hu7b28fb7e7a43ea96b4b5ba061c6032a5_1022804_480x0_resize_q75_box.jpg 480w, /p/teaching-kubernetes-service-mesh-tricks/IMG_20190824_143526709_hu7b28fb7e7a43ea96b4b5ba061c6032a5_1022804_1024x0_resize_q75_box.jpg 1024w" loading=lazy alt="Andaman Sea" class=gallery-image data-flex-grow=133 data-flex-basis=320px></p><p>We&rsquo;ll start by initializing our project for the controller using <code>go mod</code> and the <code>kubebuilder</code> framework</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-shell data-lang=shell><span class=line><span class=cl>$ go mod init github.com/ishankhare07/launchpad
+</span></span><span class=line><span class=cl>$ kubebuilder init --domain ishankhare.dev
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1># create scaffolding for the project</span>
+</span></span><span class=line><span class=cl>$ kubebuilder create api --group labs --version v1alpha1 --kind Workload
+</span></span><span class=line><span class=cl>Create Resource <span class=o>[</span>y/n<span class=o>]</span>
+</span></span><span class=line><span class=cl>y
+</span></span><span class=line><span class=cl>Create Controller <span class=o>[</span>y/n<span class=o>]</span>
+</span></span><span class=line><span class=cl>y
+</span></span><span class=line><span class=cl>Writing scaffold <span class=k>for</span> you to edit...
+</span></span></code></pre></td></tr></table></div></div><h3 id=the-crd>The CRD</h3><p>Next step is to define the CRD which we want to use for defining our traffic split to our controller. We want roughly the following yaml spec for it:</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-yaml data-lang=yaml><span class=line><span class=cl><span class=nt>apiVersion</span><span class=p>:</span><span class=w> </span><span class=l>labs.ishankhare.dev/v1alpha1</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>kind</span><span class=p>:</span><span class=w> </span><span class=l>Workload</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>metadata</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>workload-sample</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w></span><span class=nt>spec</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>host</span><span class=p>:</span><span class=w> </span><span class=l>helloworld</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>  </span><span class=nt>targets</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>helloworld-v1</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>namespace</span><span class=p>:</span><span class=w> </span><span class=l>default</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>trafficSplit</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>hosts</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span>- <span class=l>helloworld</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>subset</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>v1</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>labels</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>version</span><span class=p>:</span><span class=w> </span><span class=l>v1</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>destinationHost</span><span class=p>:</span><span class=w> </span><span class=l>helloworld</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>weight</span><span class=p>:</span><span class=w> </span><span class=m>80</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>    </span>- <span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>helloworld-v2</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>namespace</span><span class=p>:</span><span class=w> </span><span class=l>default</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>      </span><span class=nt>trafficSplit</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>hosts</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span>- <span class=l>helloworld</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>subset</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>name</span><span class=p>:</span><span class=w> </span><span class=l>v2</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>          </span><span class=nt>labels</span><span class=p>:</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>            </span><span class=nt>version</span><span class=p>:</span><span class=w> </span><span class=l>v2</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>destinationHost</span><span class=p>:</span><span class=w> </span><span class=l>helloworld</span><span class=w>
+</span></span></span><span class=line><span class=cl><span class=w>        </span><span class=nt>weight</span><span class=p>:</span><span class=w> </span><span class=m>20</span><span class=w>
+</span></span></span></code></pre></td></tr></table></div></div><p>I know there&rsquo;s room for improvement and this can be refined further, but for the purpose of this post, this should do fine. Lets go about defining this spec in our <code>api/v1alpha1/workload_types.go</code></p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span><span class=lnt>42
+</span><span class=lnt>43
+</span><span class=lnt>44
+</span><span class=lnt>45
+</span><span class=lnt>46
+</span><span class=lnt>47
+</span><span class=lnt>48
+</span><span class=lnt>49
+</span><span class=lnt>50
+</span><span class=lnt>51
+</span><span class=lnt>52
+</span><span class=lnt>53
+</span><span class=lnt>54
+</span><span class=lnt>55
+</span><span class=lnt>56
+</span><span class=lnt>57
+</span><span class=lnt>58
+</span><span class=lnt>59
+</span><span class=lnt>60
+</span><span class=lnt>61
+</span><span class=lnt>62
+</span><span class=lnt>63
+</span><span class=lnt>64
+</span><span class=lnt>65
+</span><span class=lnt>66
+</span><span class=lnt>67
+</span><span class=lnt>68
+</span><span class=lnt>69
+</span><span class=lnt>70
+</span><span class=lnt>71
+</span><span class=lnt>72
+</span><span class=lnt>73
+</span><span class=lnt>74
+</span><span class=lnt>75
+</span><span class=lnt>76
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-go data-lang=go><span class=line><span class=cl><span class=o>...</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kd>const</span> <span class=p>(</span>
+</span></span><span class=line><span class=cl>	<span class=nx>PhasePending</span> <span class=p>=</span> <span class=s>&#34;PENDING&#34;</span>
+</span></span><span class=line><span class=cl>	<span class=nx>PhaseCreated</span> <span class=p>=</span> <span class=s>&#34;CREATED&#34;</span>
+</span></span><span class=line><span class=cl><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1>// +kubebuilder:object:root=true
+</span></span></span><span class=line><span class=cl><span class=c1>// +kubebuilder:subresource:status
+</span></span></span><span class=line><span class=cl><span class=c1></span>
+</span></span><span class=line><span class=cl><span class=c1>// Workload is the Schema for the workloads API
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=kd>type</span> <span class=nx>Workload</span> <span class=kd>struct</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=nx>metav1</span><span class=p>.</span><span class=nx>TypeMeta</span>   <span class=s>`json:&#34;,inline&#34;`</span>
+</span></span><span class=line><span class=cl>	<span class=nx>metav1</span><span class=p>.</span><span class=nx>ObjectMeta</span> <span class=s>`json:&#34;metadata,omitempty&#34;`</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=nx>Spec</span>   <span class=nx>WorkloadSpec</span>   <span class=s>`json:&#34;spec,omitempty&#34;`</span>
+</span></span><span class=line><span class=cl>	<span class=nx>Status</span> <span class=nx>WorkloadStatus</span> <span class=s>`json:&#34;status,omitempty&#34;`</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kd>type</span> <span class=nx>WorkloadSpec</span> <span class=kd>struct</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=c1>// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+</span></span></span><span class=line><span class=cl><span class=c1></span>	<span class=c1>// Important: Run &#34;make&#34; to regenerate code after modifying this file
+</span></span></span><span class=line><span class=cl><span class=c1></span>
+</span></span><span class=line><span class=cl>	<span class=c1>// Host is the name of the service from the service registry
+</span></span></span><span class=line><span class=cl><span class=c1></span>	<span class=nx>Host</span> <span class=kt>string</span> <span class=s>`json:&#34;host,omitempty&#34;`</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=nx>Targets</span> <span class=p>[]</span><span class=nx>DeploymentTarget</span> <span class=s>`json:&#34;targets,omitempty&#34;`</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=c1>// WorkloadStatus defines the observed state of Workload
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=kd>type</span> <span class=nx>WorkloadStatus</span> <span class=kd>struct</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=c1>// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+</span></span></span><span class=line><span class=cl><span class=c1></span>	<span class=c1>// Important: Run &#34;make&#34; to regenerate code after modifying this file
+</span></span></span><span class=line><span class=cl><span class=c1></span>	<span class=nx>VirtualServiceState</span>  <span class=kt>string</span> <span class=s>`json:&#34;virtualServiceState,omitempty&#34;`</span>
+</span></span><span class=line><span class=cl>	<span class=nx>DestinationRuleState</span> <span class=kt>string</span> <span class=s>`json:&#34;destinationRuleState,omitempty&#34;`</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kd>type</span> <span class=nx>DeploymentTarget</span> <span class=kd>struct</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=nx>Name</span>         <span class=kt>string</span>       <span class=s>`json:&#34;name,omitempty&#34;`</span>
+</span></span><span class=line><span class=cl>	<span class=nx>Namespace</span>    <span class=kt>string</span>       <span class=s>`json:&#34;namespace,omitempty&#34;`</span>
+</span></span><span class=line><span class=cl>	<span class=nx>TrafficSplit</span> <span class=nx>TrafficSplit</span> <span class=s>`json:&#34;trafficSplit,omitempty&#34;`</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kd>type</span> <span class=nx>TrafficSplit</span> <span class=kd>struct</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=nx>Hosts</span>           <span class=p>[]</span><span class=kt>string</span>          <span class=s>`json:&#34;hosts,omitempty&#34;`</span>
+</span></span><span class=line><span class=cl>	<span class=nx>Subset</span>          <span class=nx>Subset</span>            <span class=s>`json:&#34;subset,omitempty&#34;`</span>
+</span></span><span class=line><span class=cl>	<span class=nx>DestinationHost</span> <span class=kt>string</span>            <span class=s>`json:&#34;destinationHost,omitempty&#34;`</span>
+</span></span><span class=line><span class=cl>	<span class=nx>Weight</span>          <span class=kt>int</span>               <span class=s>`json:&#34;weight,omitempty&#34;`</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kd>type</span> <span class=nx>Subset</span> <span class=kd>struct</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=nx>Name</span>   <span class=kt>string</span>            <span class=s>`json:&#34;name,omitempty&#34;`</span>
+</span></span><span class=line><span class=cl>	<span class=nx>Labels</span> <span class=kd>map</span><span class=p>[</span><span class=kt>string</span><span class=p>]</span><span class=kt>string</span> <span class=s>`json:&#34;labels,omitempty&#34;`</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kd>func</span> <span class=p>(</span><span class=nx>w</span> <span class=o>*</span><span class=nx>Workload</span><span class=p>)</span> <span class=nf>GetIstioResourceName</span><span class=p>()</span> <span class=kt>string</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=k>return</span> <span class=nx>w</span><span class=p>.</span><span class=nx>Spec</span><span class=p>.</span><span class=nx>Host</span> <span class=c1>// strings.Split(w.Spec.Targets[0].Name, &#34;-&#34;)[0]
+</span></span></span><span class=line><span class=cl><span class=c1></span><span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kd>func</span> <span class=p>(</span><span class=nx>w</span> <span class=o>*</span><span class=nx>Workload</span><span class=p>)</span> <span class=nf>GetHosts</span><span class=p>()</span> <span class=p>[]</span><span class=kt>string</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=c1>// need hosts as a set data structure
+</span></span></span><span class=line><span class=cl><span class=c1></span>	<span class=nx>hostSet</span> <span class=o>:=</span> <span class=nb>make</span><span class=p>(</span><span class=kd>map</span><span class=p>[</span><span class=kt>string</span><span class=p>]</span><span class=kt>bool</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=nx>hosts</span> <span class=o>:=</span> <span class=p>[]</span><span class=kt>string</span><span class=p>{}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=k>for</span> <span class=nx>_</span><span class=p>,</span> <span class=nx>target</span> <span class=o>:=</span> <span class=k>range</span> <span class=nx>w</span><span class=p>.</span><span class=nx>Spec</span><span class=p>.</span><span class=nx>Targets</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=k>for</span> <span class=nx>_</span><span class=p>,</span> <span class=nx>host</span> <span class=o>:=</span> <span class=k>range</span> <span class=nx>target</span><span class=p>.</span><span class=nx>TrafficSplit</span><span class=p>.</span><span class=nx>Hosts</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>			<span class=nx>hostSet</span><span class=p>[</span><span class=nx>host</span><span class=p>]</span> <span class=p>=</span> <span class=kc>true</span>
+</span></span><span class=line><span class=cl>		<span class=p>}</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=k>for</span> <span class=nx>host</span> <span class=o>:=</span> <span class=k>range</span> <span class=nx>hostSet</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=nx>hosts</span> <span class=p>=</span> <span class=nb>append</span><span class=p>(</span><span class=nx>hosts</span><span class=p>,</span> <span class=nx>host</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=k>return</span> <span class=nx>hosts</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>This should be enough to define our define the yaml that we presented before. If you&rsquo;re following along the code in the repo, the above is defined in <a class=link href=https://github.com/ishankhare07/launchpad/blob/master/api/v1alpha1/workload_types.go target=_blank rel=noopener>api/v1alpha1/workload_types.go</a>. We also add some additional helper methods on the objects that will be useful later.</p><h3 id=the-controller>The controller</h3><p>Let&rsquo;s jump to <a class=link href=https://github.com/ishankhare07/launchpad/blob/master/controllers/workload_controller.go target=_blank rel=noopener>controllers/workload_controller.go</a>. I&rsquo;m only going to show the relevant sections of the code here in favour of brevity. For detailed code one can go and see the linked file.</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span><span class=lnt>42
+</span><span class=lnt>43
+</span><span class=lnt>44
+</span><span class=lnt>45
+</span><span class=lnt>46
+</span><span class=lnt>47
+</span><span class=lnt>48
+</span><span class=lnt>49
+</span><span class=lnt>50
+</span><span class=lnt>51
+</span><span class=lnt>52
+</span><span class=lnt>53
+</span><span class=lnt>54
+</span><span class=lnt>55
+</span><span class=lnt>56
+</span><span class=lnt>57
+</span><span class=lnt>58
+</span><span class=lnt>59
+</span><span class=lnt>60
+</span><span class=lnt>61
+</span><span class=lnt>62
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-go data-lang=go><span class=line><span class=cl><span class=o>...</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kd>func</span> <span class=p>(</span><span class=nx>r</span> <span class=o>*</span><span class=nx>WorkloadReconciler</span><span class=p>)</span> <span class=nf>Reconcile</span><span class=p>(</span><span class=nx>ctx</span> <span class=nx>context</span><span class=p>.</span><span class=nx>Context</span><span class=p>,</span> <span class=nx>req</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nx>Request</span><span class=p>)</span> <span class=p>(</span><span class=nx>ctrl</span><span class=p>.</span><span class=nx>Result</span><span class=p>,</span> <span class=kt>error</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=nx>reqLogger</span> <span class=o>:=</span> <span class=nx>r</span><span class=p>.</span><span class=nx>Log</span><span class=p>.</span><span class=nf>WithValues</span><span class=p>(</span><span class=s>&#34;workload&#34;</span><span class=p>,</span> <span class=nx>req</span><span class=p>.</span><span class=nx>NamespacedName</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=c1>// your logic here
+</span></span></span><span class=line><span class=cl><span class=c1></span>	<span class=nx>reqLogger</span><span class=p>.</span><span class=nf>Info</span><span class=p>(</span><span class=s>&#34;====== Reconciling Workload =======&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=nx>instance</span> <span class=o>:=</span> <span class=o>&amp;</span><span class=nx>labsv1alpha1</span><span class=p>.</span><span class=nx>Workload</span><span class=p>{}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=nx>err</span> <span class=o>:=</span> <span class=nx>r</span><span class=p>.</span><span class=nf>Get</span><span class=p>(</span><span class=nx>context</span><span class=p>.</span><span class=nf>TODO</span><span class=p>(),</span> <span class=nx>req</span><span class=p>.</span><span class=nx>NamespacedName</span><span class=p>,</span> <span class=nx>instance</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=nx>err</span> <span class=o>!=</span> <span class=kc>nil</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=c1>// object not found, could have been deleted after
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=c1>// reconcile request, hence don&#39;t requeue
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=k>if</span> <span class=nx>errors</span><span class=p>.</span><span class=nf>IsNotFound</span><span class=p>(</span><span class=nx>err</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>			<span class=k>return</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nx>Result</span><span class=p>{},</span> <span class=kc>nil</span>
+</span></span><span class=line><span class=cl>		<span class=p>}</span>
+</span></span><span class=line><span class=cl>		<span class=c1>// error reading the object, requeue the request
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=k>return</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nx>Result</span><span class=p>{},</span> <span class=nx>err</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=nx>reqLogger</span><span class=p>.</span><span class=nf>Info</span><span class=p>(</span><span class=s>&#34;Workload created for following targets.&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=k>for</span> <span class=nx>_</span><span class=p>,</span> <span class=nx>target</span> <span class=o>:=</span> <span class=k>range</span> <span class=nx>instance</span><span class=p>.</span><span class=nx>Spec</span><span class=p>.</span><span class=nx>Targets</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=nx>reqLogger</span><span class=p>.</span><span class=nf>Info</span><span class=p>(</span><span class=s>&#34;target&#34;</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>			<span class=s>&#34;name&#34;</span><span class=p>,</span> <span class=nx>target</span><span class=p>.</span><span class=nx>Name</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>			<span class=s>&#34;namespace&#34;</span><span class=p>,</span> <span class=nx>target</span><span class=p>.</span><span class=nx>Namespace</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>			<span class=s>&#34;hosts&#34;</span><span class=p>,</span> <span class=nx>fmt</span><span class=p>.</span><span class=nf>Sprintf</span><span class=p>(</span><span class=s>&#34;%v&#34;</span><span class=p>,</span> <span class=nx>target</span><span class=p>.</span><span class=nx>TrafficSplit</span><span class=p>.</span><span class=nx>Hosts</span><span class=p>))</span>
+</span></span><span class=line><span class=cl>		<span class=nx>reqLogger</span><span class=p>.</span><span class=nf>Info</span><span class=p>(</span><span class=s>&#34;subset&#34;</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>			<span class=s>&#34;subset name&#34;</span><span class=p>,</span> <span class=nx>target</span><span class=p>.</span><span class=nx>TrafficSplit</span><span class=p>.</span><span class=nx>Subset</span><span class=p>.</span><span class=nx>Name</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>			<span class=s>&#34;subset labels&#34;</span><span class=p>,</span> <span class=nx>fmt</span><span class=p>.</span><span class=nf>Sprintf</span><span class=p>(</span><span class=s>&#34;%v&#34;</span><span class=p>,</span> <span class=nx>target</span><span class=p>.</span><span class=nx>TrafficSplit</span><span class=p>.</span><span class=nx>Subset</span><span class=p>.</span><span class=nx>Labels</span><span class=p>),</span>
+</span></span><span class=line><span class=cl>			<span class=s>&#34;weight&#34;</span><span class=p>,</span> <span class=nx>target</span><span class=p>.</span><span class=nx>TrafficSplit</span><span class=p>.</span><span class=nx>Weight</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=c1>// check current status of owned resources
+</span></span></span><span class=line><span class=cl><span class=c1></span>	<span class=k>if</span> <span class=nx>instance</span><span class=p>.</span><span class=nx>Status</span><span class=p>.</span><span class=nx>VirtualServiceState</span> <span class=o>==</span> <span class=s>&#34;&#34;</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=nx>instance</span><span class=p>.</span><span class=nx>Status</span><span class=p>.</span><span class=nx>VirtualServiceState</span> <span class=p>=</span> <span class=nx>labsv1alpha1</span><span class=p>.</span><span class=nx>PhasePending</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=nx>instance</span><span class=p>.</span><span class=nx>Status</span><span class=p>.</span><span class=nx>DestinationRuleState</span> <span class=o>==</span> <span class=s>&#34;&#34;</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=nx>instance</span><span class=p>.</span><span class=nx>Status</span><span class=p>.</span><span class=nx>DestinationRuleState</span> <span class=p>=</span> <span class=nx>labsv1alpha1</span><span class=p>.</span><span class=nx>PhasePending</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=c1>// check virtual service status
+</span></span></span><span class=line><span class=cl><span class=c1></span>	<span class=nx>vsResult</span><span class=p>,</span> <span class=nx>err</span> <span class=o>:=</span> <span class=nx>r</span><span class=p>.</span><span class=nf>checkVirtualServiceStatus</span><span class=p>(</span><span class=nx>instance</span><span class=p>,</span> <span class=nx>req</span><span class=p>,</span> <span class=nx>reqLogger</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=nx>err</span> <span class=o>!=</span> <span class=kc>nil</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=k>return</span> <span class=nx>vsResult</span><span class=p>,</span> <span class=nx>err</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=c1>// check destination rule status
+</span></span></span><span class=line><span class=cl><span class=c1></span>	<span class=nx>destRuleResult</span><span class=p>,</span> <span class=nx>err</span> <span class=o>:=</span> <span class=nx>r</span><span class=p>.</span><span class=nf>checkDestinationRuleStatus</span><span class=p>(</span><span class=nx>instance</span><span class=p>,</span> <span class=nx>req</span><span class=p>,</span> <span class=nx>reqLogger</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=nx>err</span> <span class=o>!=</span> <span class=kc>nil</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=k>return</span> <span class=nx>destRuleResult</span><span class=p>,</span> <span class=nx>err</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=c1>// update status
+</span></span></span><span class=line><span class=cl><span class=c1></span>	<span class=nx>err</span> <span class=p>=</span> <span class=nx>r</span><span class=p>.</span><span class=nf>Status</span><span class=p>().</span><span class=nf>Update</span><span class=p>(</span><span class=nx>context</span><span class=p>.</span><span class=nf>TODO</span><span class=p>(),</span> <span class=nx>instance</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=k>if</span> <span class=nx>err</span> <span class=o>!=</span> <span class=kc>nil</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=k>return</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nx>Result</span><span class=p>{},</span> <span class=nx>err</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=k>return</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nx>Result</span><span class=p>{},</span> <span class=kc>nil</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>Here we are simply logging what the controller &ldquo;sees&rdquo; is requested to be created as <em>&ldquo;desired state&rdquo;</em> through the CRD.
+Next we are calling the relevant functions <code>checkVirtualServiceStatus</code> and <code>checkDestinationRuleStatus</code>. There implementation is explained below, with just the following intention:</p><blockquote><p>If the <code>VirtualService</code> or <code>DestinationRule</code> doesn&rsquo;t exist yet, try to create it with the correct spec.</p></blockquote><h3 id=the-virtualservice-check>The VirtualService check</h3><p>In the same file let&rsquo;s implement the <code>checkVirtualServiceStatus</code> method, please scroll to the right for extra comments explaining each section:</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span><span class=lnt>42
+</span><span class=lnt>43
+</span><span class=lnt>44
+</span><span class=lnt>45
+</span><span class=lnt>46
+</span><span class=lnt>47
+</span><span class=lnt>48
+</span><span class=lnt>49
+</span><span class=lnt>50
+</span><span class=lnt>51
+</span><span class=lnt>52
+</span><span class=lnt>53
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-go data-lang=go><span class=line><span class=cl><span class=o>...</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kd>func</span> <span class=p>(</span><span class=nx>r</span> <span class=o>*</span><span class=nx>WorkloadReconciler</span><span class=p>)</span> <span class=nf>checkVirtualServiceStatus</span><span class=p>(</span><span class=nx>instance</span> <span class=o>*</span><span class=nx>labsv1alpha1</span><span class=p>.</span><span class=nx>Workload</span><span class=p>,</span> <span class=nx>req</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nx>Request</span><span class=p>,</span> <span class=nx>logger</span> <span class=nx>logr</span><span class=p>.</span><span class=nx>Logger</span><span class=p>)</span> <span class=p>(</span><span class=nx>ctrl</span><span class=p>.</span><span class=nx>Result</span><span class=p>,</span> <span class=kt>error</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=k>switch</span> <span class=nx>instance</span><span class=p>.</span><span class=nx>Status</span><span class=p>.</span><span class=nx>VirtualServiceState</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=k>case</span> <span class=nx>labsv1alpha1</span><span class=p>.</span><span class=nx>PhasePending</span><span class=p>:</span>
+</span></span><span class=line><span class=cl>		<span class=nx>logger</span><span class=p>.</span><span class=nf>Info</span><span class=p>(</span><span class=s>&#34;Virtual Service&#34;</span><span class=p>,</span> <span class=s>&#34;PHASE:&#34;</span><span class=p>,</span> <span class=nx>instance</span><span class=p>.</span><span class=nx>Status</span><span class=p>.</span><span class=nx>VirtualServiceState</span><span class=p>)</span>			<span class=c1>// If still in pending state (initial condition)
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=nx>logger</span><span class=p>.</span><span class=nf>Info</span><span class=p>(</span><span class=s>&#34;Transitioning state to create Virtual Service&#34;</span><span class=p>)</span>							<span class=c1>// transition to the creating state	 
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=nx>instance</span><span class=p>.</span><span class=nx>Status</span><span class=p>.</span><span class=nx>VirtualServiceState</span> <span class=p>=</span> <span class=nx>labsv1alpha1</span><span class=p>.</span><span class=nx>PhaseCreated</span>							<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>	<span class=k>case</span> <span class=nx>labsv1alpha1</span><span class=p>.</span><span class=nx>PhaseCreated</span><span class=p>:</span>
+</span></span><span class=line><span class=cl>		<span class=nx>logger</span><span class=p>.</span><span class=nf>Info</span><span class=p>(</span><span class=s>&#34;Virtual Service&#34;</span><span class=p>,</span> <span class=s>&#34;PHASE:&#34;</span><span class=p>,</span> <span class=nx>instance</span><span class=p>.</span><span class=nx>Status</span><span class=p>.</span><span class=nx>VirtualServiceState</span><span class=p>)</span>				<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=nx>query</span> <span class=o>:=</span> <span class=o>&amp;</span><span class=nx>istiov1alpha3</span><span class=p>.</span><span class=nx>VirtualService</span><span class=p>{}</span>													<span class=c1>// create an empty query object
+</span></span></span><span class=line><span class=cl><span class=c1></span>																									<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=c1>// check if virtual service already exists													//---------\
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=nx>lookupKey</span> <span class=o>:=</span> <span class=nx>types</span><span class=p>.</span><span class=nx>NamespacedName</span><span class=p>{</span>															<span class=c1>//			\
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=nx>Name</span><span class=p>:</span>      <span class=nx>instance</span><span class=p>.</span><span class=nf>GetIstioResourceName</span><span class=p>(),</span>												<span class=c1>//			 --- construct the query object
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=nx>Namespace</span><span class=p>:</span> <span class=nx>instance</span><span class=p>.</span><span class=nf>GetNamespace</span><span class=p>(),</span>														<span class=c1>//			/
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=p>}</span>																							<span class=c1>//---------/
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=nx>err</span> <span class=o>:=</span> <span class=nx>r</span><span class=p>.</span><span class=nf>Get</span><span class=p>(</span><span class=nx>context</span><span class=p>.</span><span class=nf>TODO</span><span class=p>(),</span> <span class=nx>lookupKey</span><span class=p>,</span> <span class=nx>query</span><span class=p>)</span>												<span class=c1>// query result
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=k>if</span> <span class=nx>err</span> <span class=o>!=</span> <span class=kc>nil</span> <span class=o>&amp;&amp;</span> <span class=nx>errors</span><span class=p>.</span><span class=nf>IsNotFound</span><span class=p>(</span><span class=nx>err</span><span class=p>)</span> <span class=p>{</span>													<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=nx>logger</span><span class=p>.</span><span class=nf>Info</span><span class=p>(</span><span class=s>&#34;virtual service not found but should exist&#34;</span><span class=p>,</span> <span class=s>&#34;lookup key&#34;</span><span class=p>,</span> <span class=nx>lookupKey</span><span class=p>)</span>		<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=nx>logger</span><span class=p>.</span><span class=nf>Info</span><span class=p>(</span><span class=nx>err</span><span class=p>.</span><span class=nf>Error</span><span class=p>())</span>																<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=c1>// virtual service got deleted or hasn&#39;t been created yet								//
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=c1>// create one now																		//
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=nx>vs</span> <span class=o>:=</span> <span class=nx>spawn</span><span class=p>.</span><span class=nf>CreateVirtualService</span><span class=p>(</span><span class=nx>instance</span><span class=p>)</span>												<span class=c1>// create the actual virtual service as defined by Istio
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=nx>err</span> <span class=p>=</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nf>SetControllerReference</span><span class=p>(</span><span class=nx>instance</span><span class=p>,</span> <span class=nx>vs</span><span class=p>,</span> <span class=nx>r</span><span class=p>.</span><span class=nx>Scheme</span><span class=p>)</span>								<span class=c1>// Set owner references on the created object
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=k>if</span> <span class=nx>err</span> <span class=o>!=</span> <span class=kc>nil</span> <span class=p>{</span>																			<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>				<span class=nx>logger</span><span class=p>.</span><span class=nf>Error</span><span class=p>(</span><span class=nx>err</span><span class=p>,</span> <span class=s>&#34;Error setting controller reference&#34;</span><span class=p>)</span>								<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>				<span class=k>return</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nx>Result</span><span class=p>{},</span> <span class=nx>err</span>															<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=p>}</span>																						<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>																									<span class=c1>// 
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=nx>err</span> <span class=p>=</span> <span class=nx>r</span><span class=p>.</span><span class=nf>Create</span><span class=p>(</span><span class=nx>context</span><span class=p>.</span><span class=nf>TODO</span><span class=p>(),</span> <span class=nx>vs</span><span class=p>)</span>														<span class=c1>// request the API server to create the actual object in
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=k>if</span> <span class=nx>err</span> <span class=o>!=</span> <span class=kc>nil</span> <span class=p>{</span>																			<span class=c1>// the cluster i.e. persist in the etcd store
+</span></span></span><span class=line><span class=cl><span class=c1></span>				<span class=nx>logger</span><span class=p>.</span><span class=nf>Error</span><span class=p>(</span><span class=nx>err</span><span class=p>,</span> <span class=s>&#34;Unable to create Virtual Service&#34;</span><span class=p>)</span>								<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>				<span class=k>return</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nx>Result</span><span class=p>{},</span> <span class=nx>err</span>															<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=p>}</span>																						<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>																									<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=nx>logger</span><span class=p>.</span><span class=nf>Info</span><span class=p>(</span><span class=s>&#34;Successfully created virtual service&#34;</span><span class=p>)</span>										<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=p>}</span> <span class=k>else</span> <span class=k>if</span> <span class=nx>err</span> <span class=o>!=</span> <span class=kc>nil</span> <span class=p>{</span>																		<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=nx>logger</span><span class=p>.</span><span class=nf>Error</span><span class=p>(</span><span class=nx>err</span><span class=p>,</span> <span class=s>&#34;Unable to create Virtual Service&#34;</span><span class=p>)</span>									<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=k>return</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nx>Result</span><span class=p>{},</span> <span class=nx>err</span>																<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=p>}</span> <span class=k>else</span> <span class=p>{</span>																					<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=c1>// don&#39;t requeue, it will happen automatically when										//
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=c1>// virtual service status changes														//
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=k>return</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nx>Result</span><span class=p>{},</span> <span class=kc>nil</span>																<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=p>}</span>																							<span class=c1>//
+</span></span></span><span class=line><span class=cl><span class=c1></span>
+</span></span><span class=line><span class=cl>		<span class=c1>// more fields related to virtual service status can be checked
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=c1>// see more at https://pkg.go.dev/istio.io/api/meta/v1alpha1#IstioStatus
+</span></span></span><span class=line><span class=cl><span class=c1></span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=k>return</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nx>Result</span><span class=p>{},</span> <span class=kc>nil</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>The line <code>vs := spawn.CreateVirtualService(instance)</code> defines another function to create the actual <code>Istio</code> <code>VirtualService</code> for us which we will define further in the <code>spawn</code> package.</p><h3 id=the-destinationrule-check>The DestinationRule check</h3><p>Similar to the virtual service, we&rsquo;ll create the <code>checkDestinationRuleStatus</code> method in the same file:</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span><span class=lnt>42
+</span><span class=lnt>43
+</span><span class=lnt>44
+</span><span class=lnt>45
+</span><span class=lnt>46
+</span><span class=lnt>47
+</span><span class=lnt>48
+</span><span class=lnt>49
+</span><span class=lnt>50
+</span><span class=lnt>51
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-go data-lang=go><span class=line><span class=cl><span class=o>...</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kd>func</span> <span class=p>(</span><span class=nx>r</span> <span class=o>*</span><span class=nx>WorkloadReconciler</span><span class=p>)</span> <span class=nf>checkDestinationRuleStatus</span><span class=p>(</span><span class=nx>instance</span> <span class=o>*</span><span class=nx>labsv1alpha1</span><span class=p>.</span><span class=nx>Workload</span><span class=p>,</span> <span class=nx>req</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nx>Request</span><span class=p>,</span> <span class=nx>logger</span> <span class=nx>logr</span><span class=p>.</span><span class=nx>Logger</span><span class=p>)</span> <span class=p>(</span><span class=nx>ctrl</span><span class=p>.</span><span class=nx>Result</span><span class=p>,</span> <span class=kt>error</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=k>switch</span> <span class=nx>instance</span><span class=p>.</span><span class=nx>Status</span><span class=p>.</span><span class=nx>DestinationRuleState</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=k>case</span> <span class=nx>labsv1alpha1</span><span class=p>.</span><span class=nx>PhasePending</span><span class=p>:</span>
+</span></span><span class=line><span class=cl>		<span class=nx>logger</span><span class=p>.</span><span class=nf>Info</span><span class=p>(</span><span class=s>&#34;Destination Rule&#34;</span><span class=p>,</span> <span class=s>&#34;PHASE:&#34;</span><span class=p>,</span> <span class=nx>instance</span><span class=p>.</span><span class=nx>Status</span><span class=p>.</span><span class=nx>DestinationRuleState</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>		<span class=nx>logger</span><span class=p>.</span><span class=nf>Info</span><span class=p>(</span><span class=s>&#34;Transitioning state to create Destination Rule&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>		<span class=nx>instance</span><span class=p>.</span><span class=nx>Status</span><span class=p>.</span><span class=nx>DestinationRuleState</span> <span class=p>=</span> <span class=nx>labsv1alpha1</span><span class=p>.</span><span class=nx>PhaseCreated</span>
+</span></span><span class=line><span class=cl>	<span class=k>case</span> <span class=nx>labsv1alpha1</span><span class=p>.</span><span class=nx>PhaseCreated</span><span class=p>:</span>
+</span></span><span class=line><span class=cl>		<span class=nx>logger</span><span class=p>.</span><span class=nf>Info</span><span class=p>(</span><span class=s>&#34;Destination Rule&#34;</span><span class=p>,</span> <span class=s>&#34;PHASE:&#34;</span><span class=p>,</span> <span class=nx>instance</span><span class=p>.</span><span class=nx>Status</span><span class=p>.</span><span class=nx>DestinationRuleState</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>		<span class=nx>query</span> <span class=o>:=</span> <span class=o>&amp;</span><span class=nx>istiov1alpha3</span><span class=p>.</span><span class=nx>DestinationRule</span><span class=p>{}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>		<span class=c1>// check if destination rule already exists
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=nx>lookupKey</span> <span class=o>:=</span> <span class=nx>types</span><span class=p>.</span><span class=nx>NamespacedName</span><span class=p>{</span>
+</span></span><span class=line><span class=cl>			<span class=nx>Name</span><span class=p>:</span>      <span class=nx>instance</span><span class=p>.</span><span class=nf>GetIstioResourceName</span><span class=p>(),</span>
+</span></span><span class=line><span class=cl>			<span class=nx>Namespace</span><span class=p>:</span> <span class=nx>instance</span><span class=p>.</span><span class=nf>GetNamespace</span><span class=p>(),</span>
+</span></span><span class=line><span class=cl>		<span class=p>}</span>
+</span></span><span class=line><span class=cl>		<span class=nx>err</span> <span class=o>:=</span> <span class=nx>r</span><span class=p>.</span><span class=nf>Get</span><span class=p>(</span><span class=nx>context</span><span class=p>.</span><span class=nf>TODO</span><span class=p>(),</span>
+</span></span><span class=line><span class=cl>			<span class=nx>lookupKey</span><span class=p>,</span> <span class=nx>query</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>		<span class=k>if</span> <span class=nx>err</span> <span class=o>!=</span> <span class=kc>nil</span> <span class=o>&amp;&amp;</span> <span class=nx>errors</span><span class=p>.</span><span class=nf>IsNotFound</span><span class=p>(</span><span class=nx>err</span><span class=p>)</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>			<span class=nx>logger</span><span class=p>.</span><span class=nf>Info</span><span class=p>(</span><span class=s>&#34;destination rule not found but should exist&#34;</span><span class=p>,</span> <span class=s>&#34;req key&#34;</span><span class=p>,</span> <span class=nx>lookupKey</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>			<span class=nx>logger</span><span class=p>.</span><span class=nf>Info</span><span class=p>(</span><span class=nx>err</span><span class=p>.</span><span class=nf>Error</span><span class=p>())</span>
+</span></span><span class=line><span class=cl>			<span class=c1>// destination rule got deleted or hasn&#39;t been created yet
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=c1>// create one now
+</span></span></span><span class=line><span class=cl><span class=c1></span>
+</span></span><span class=line><span class=cl>			<span class=nx>dr</span> <span class=o>:=</span> <span class=nx>spawn</span><span class=p>.</span><span class=nf>CreateDestinationRule</span><span class=p>(</span><span class=nx>instance</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>			<span class=nx>err</span> <span class=o>:=</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nf>SetControllerReference</span><span class=p>(</span><span class=nx>instance</span><span class=p>,</span> <span class=nx>dr</span><span class=p>,</span> <span class=nx>r</span><span class=p>.</span><span class=nx>Scheme</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>			<span class=k>if</span> <span class=nx>err</span> <span class=o>!=</span> <span class=kc>nil</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>				<span class=nx>logger</span><span class=p>.</span><span class=nf>Error</span><span class=p>(</span><span class=nx>err</span><span class=p>,</span> <span class=s>&#34;Error setting controller reference&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>				<span class=k>return</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nx>Result</span><span class=p>{},</span> <span class=nx>err</span>
+</span></span><span class=line><span class=cl>			<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>			<span class=nx>err</span> <span class=p>=</span> <span class=nx>r</span><span class=p>.</span><span class=nf>Create</span><span class=p>(</span><span class=nx>context</span><span class=p>.</span><span class=nf>TODO</span><span class=p>(),</span> <span class=nx>dr</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>			<span class=k>if</span> <span class=nx>err</span> <span class=o>!=</span> <span class=kc>nil</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>				<span class=nx>logger</span><span class=p>.</span><span class=nf>Error</span><span class=p>(</span><span class=nx>err</span><span class=p>,</span> <span class=s>&#34;Unable to create Destination Rule&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>				<span class=k>return</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nx>Result</span><span class=p>{},</span> <span class=nx>err</span>
+</span></span><span class=line><span class=cl>			<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>			<span class=nx>logger</span><span class=p>.</span><span class=nf>Info</span><span class=p>(</span><span class=s>&#34;Successfully created Destination Rule&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>		<span class=p>}</span> <span class=k>else</span> <span class=k>if</span> <span class=nx>err</span> <span class=o>!=</span> <span class=kc>nil</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>			<span class=nx>logger</span><span class=p>.</span><span class=nf>Error</span><span class=p>(</span><span class=nx>err</span><span class=p>,</span> <span class=s>&#34;Unable to create destination rule&#34;</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>			<span class=k>return</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nx>Result</span><span class=p>{},</span> <span class=nx>err</span>
+</span></span><span class=line><span class=cl>		<span class=p>}</span> <span class=k>else</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>			<span class=c1>// don&#39;t requeue, it will happen automatically when
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=c1>// destination rule status changes
+</span></span></span><span class=line><span class=cl><span class=c1></span>			<span class=k>return</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nx>Result</span><span class=p>{},</span> <span class=kc>nil</span>
+</span></span><span class=line><span class=cl>		<span class=p>}</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=k>return</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nx>Result</span><span class=p>{},</span> <span class=kc>nil</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>The line <code>dr := spawn.CreateDestinationRule(instance)</code> defines another function to create the actual <code>Istio</code> <code>DestinationRule</code> for us, which we will define further in the <code>spawn</code> package.</p><h3 id=creating-the-istio-crds-defining-the-spawn-package>Creating the Istio CRD&rsquo;s (defining the &lsquo;spawn&rsquo;) package</h3><p>Let&rsquo;s create the following two files in the <code>pkg</code> directory:</p><ol><li><a class=link href=https://github.com/ishankhare07/launchpad/blob/master/pkg/spawn/destination-rule.go target=_blank rel=noopener>destination-rule.go</a></li><li><a class=link href=https://github.com/ishankhare07/launchpad/blob/master/pkg/spawn/virtual-service.go target=_blank rel=noopener>virtual-service.go</a></li></ol><p>The structure should be as follows:</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-shell data-lang=shell><span class=line><span class=cl>$ tree ./pkg
+</span></span><span class=line><span class=cl>./pkg
+</span></span><span class=line><span class=cl>└── spawn
+</span></span><span class=line><span class=cl>    ├── destination-rule.go
+</span></span><span class=line><span class=cl>    └── virtual-service.go
+</span></span></code></pre></td></tr></table></div></div><p>In the file <a class=link href=https://github.com/ishankhare07/launchpad/blob/master/pkg/spawn/virtual-service.go target=_blank rel=noopener><code>virtual-service.go</code></a></p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span><span class=lnt>29
+</span><span class=lnt>30
+</span><span class=lnt>31
+</span><span class=lnt>32
+</span><span class=lnt>33
+</span><span class=lnt>34
+</span><span class=lnt>35
+</span><span class=lnt>36
+</span><span class=lnt>37
+</span><span class=lnt>38
+</span><span class=lnt>39
+</span><span class=lnt>40
+</span><span class=lnt>41
+</span><span class=lnt>42
+</span><span class=lnt>43
+</span><span class=lnt>44
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-go data-lang=go><span class=line><span class=cl><span class=kn>package</span> <span class=nx>spawn</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kn>import</span> <span class=p>(</span>
+</span></span><span class=line><span class=cl>	<span class=nx>labsv1alpha1</span> <span class=s>&#34;github.com/ishankhare07/launchpad/api/v1alpha1&#34;</span>
+</span></span><span class=line><span class=cl>	<span class=nx>istionetworkingv1alpha3</span> <span class=s>&#34;istio.io/api/networking/v1alpha3&#34;</span>				<span class=c1>// ---------\
+</span></span></span><span class=line><span class=cl><span class=c1></span>																			<span class=c1>// 			 - import the required Istio structures (CRD&#39;s)
+</span></span></span><span class=line><span class=cl><span class=c1></span>	<span class=nx>istiov1alpha3</span> <span class=s>&#34;istio.io/client-go/pkg/apis/networking/v1alpha3&#34;</span>			<span class=c1>// ---------/
+</span></span></span><span class=line><span class=cl><span class=c1></span>	<span class=nx>metav1</span> <span class=s>&#34;k8s.io/apimachinery/pkg/apis/meta/v1&#34;</span>
+</span></span><span class=line><span class=cl><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kd>func</span> <span class=nf>CreateVirtualService</span><span class=p>(</span><span class=nx>workload</span> <span class=o>*</span><span class=nx>labsv1alpha1</span><span class=p>.</span><span class=nx>Workload</span><span class=p>)</span> <span class=o>*</span><span class=nx>istiov1alpha3</span><span class=p>.</span><span class=nx>VirtualService</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=nx>vs</span> <span class=o>:=</span> <span class=o>&amp;</span><span class=nx>istiov1alpha3</span><span class=p>.</span><span class=nx>VirtualService</span><span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=nx>ObjectMeta</span><span class=p>:</span> <span class=nx>metav1</span><span class=p>.</span><span class=nx>ObjectMeta</span><span class=p>{</span>
+</span></span><span class=line><span class=cl>			<span class=nx>Name</span><span class=p>:</span>      <span class=nx>workload</span><span class=p>.</span><span class=nf>GetIstioResourceName</span><span class=p>(),</span>
+</span></span><span class=line><span class=cl>			<span class=nx>Namespace</span><span class=p>:</span> <span class=s>&#34;default&#34;</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>		<span class=p>},</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=nx>routeDestination</span> <span class=o>:=</span> <span class=p>[]</span><span class=o>*</span><span class=nx>istionetworkingv1alpha3</span><span class=p>.</span><span class=nx>HTTPRouteDestination</span><span class=p>{}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=k>for</span> <span class=nx>_</span><span class=p>,</span> <span class=nx>target</span> <span class=o>:=</span> <span class=k>range</span> <span class=nx>workload</span><span class=p>.</span><span class=nx>Spec</span><span class=p>.</span><span class=nx>Targets</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=c1>// extract route from CRD
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=nx>route</span> <span class=o>:=</span> <span class=o>&amp;</span><span class=nx>istionetworkingv1alpha3</span><span class=p>.</span><span class=nx>HTTPRouteDestination</span><span class=p>{</span>
+</span></span><span class=line><span class=cl>			<span class=nx>Destination</span><span class=p>:</span> <span class=o>&amp;</span><span class=nx>istionetworkingv1alpha3</span><span class=p>.</span><span class=nx>Destination</span><span class=p>{</span>
+</span></span><span class=line><span class=cl>				<span class=nx>Host</span><span class=p>:</span>   <span class=nx>target</span><span class=p>.</span><span class=nx>TrafficSplit</span><span class=p>.</span><span class=nx>DestinationHost</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>				<span class=nx>Subset</span><span class=p>:</span> <span class=nx>target</span><span class=p>.</span><span class=nx>TrafficSplit</span><span class=p>.</span><span class=nx>Subset</span><span class=p>.</span><span class=nx>Name</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>			<span class=p>},</span>
+</span></span><span class=line><span class=cl>			<span class=nx>Weight</span><span class=p>:</span> <span class=nb>int32</span><span class=p>(</span><span class=nx>target</span><span class=p>.</span><span class=nx>TrafficSplit</span><span class=p>.</span><span class=nx>Weight</span><span class=p>),</span>
+</span></span><span class=line><span class=cl>		<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>		<span class=c1>// append routes into route destination
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=nx>routeDestination</span> <span class=p>=</span> <span class=nb>append</span><span class=p>(</span><span class=nx>routeDestination</span><span class=p>,</span> <span class=nx>route</span><span class=p>)</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=c1>// append route destination to VirtualService.Routes
+</span></span></span><span class=line><span class=cl><span class=c1></span>	<span class=nx>vs</span><span class=p>.</span><span class=nx>Spec</span><span class=p>.</span><span class=nx>Http</span> <span class=p>=</span> <span class=nb>append</span><span class=p>(</span><span class=nx>vs</span><span class=p>.</span><span class=nx>Spec</span><span class=p>.</span><span class=nx>Http</span><span class=p>,</span> <span class=o>&amp;</span><span class=nx>istionetworkingv1alpha3</span><span class=p>.</span><span class=nx>HTTPRoute</span><span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=nx>Route</span><span class=p>:</span> <span class=nx>routeDestination</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>	<span class=p>})</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=c1>// set hosts
+</span></span></span><span class=line><span class=cl><span class=c1></span>	<span class=nx>vs</span><span class=p>.</span><span class=nx>Spec</span><span class=p>.</span><span class=nx>Hosts</span> <span class=p>=</span> <span class=nx>workload</span><span class=p>.</span><span class=nf>GetHosts</span><span class=p>()</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=k>return</span> <span class=nx>vs</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>We import the right structures from the Istio&rsquo;s upstream repo and construct the object based on the values provided in our original <code>Workload</code> CRD.
+In the similar way we define the destination rule object generation in the file <a class=link href=https://github.com/ishankhare07/launchpad/blob/master/pkg/spawn/destination-rule.go target=_blank rel=noopener><code>destination-rule.go</code></a></p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span><span class=lnt>13
+</span><span class=lnt>14
+</span><span class=lnt>15
+</span><span class=lnt>16
+</span><span class=lnt>17
+</span><span class=lnt>18
+</span><span class=lnt>19
+</span><span class=lnt>20
+</span><span class=lnt>21
+</span><span class=lnt>22
+</span><span class=lnt>23
+</span><span class=lnt>24
+</span><span class=lnt>25
+</span><span class=lnt>26
+</span><span class=lnt>27
+</span><span class=lnt>28
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-go data-lang=go><span class=line><span class=cl><span class=kn>package</span> <span class=nx>spawn</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kn>import</span> <span class=p>(</span>
+</span></span><span class=line><span class=cl>	<span class=nx>labsv1alpha1</span> <span class=s>&#34;github.com/ishankhare07/launchpad/api/v1alpha1&#34;</span>
+</span></span><span class=line><span class=cl>	<span class=nx>istionetworkingv1alpha3</span> <span class=s>&#34;istio.io/api/networking/v1alpha3&#34;</span>
+</span></span><span class=line><span class=cl>	<span class=nx>istiov1alpha3</span> <span class=s>&#34;istio.io/client-go/pkg/apis/networking/v1alpha3&#34;</span>
+</span></span><span class=line><span class=cl>	<span class=nx>metav1</span> <span class=s>&#34;k8s.io/apimachinery/pkg/apis/meta/v1&#34;</span>
+</span></span><span class=line><span class=cl><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kd>func</span> <span class=nf>CreateDestinationRule</span><span class=p>(</span><span class=nx>workload</span> <span class=o>*</span><span class=nx>labsv1alpha1</span><span class=p>.</span><span class=nx>Workload</span><span class=p>)</span> <span class=o>*</span><span class=nx>istiov1alpha3</span><span class=p>.</span><span class=nx>DestinationRule</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=nx>dr</span> <span class=o>:=</span> <span class=o>&amp;</span><span class=nx>istiov1alpha3</span><span class=p>.</span><span class=nx>DestinationRule</span><span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=nx>ObjectMeta</span><span class=p>:</span> <span class=nx>metav1</span><span class=p>.</span><span class=nx>ObjectMeta</span><span class=p>{</span>
+</span></span><span class=line><span class=cl>			<span class=nx>Name</span><span class=p>:</span>      <span class=nx>workload</span><span class=p>.</span><span class=nf>GetIstioResourceName</span><span class=p>(),</span>
+</span></span><span class=line><span class=cl>			<span class=nx>Namespace</span><span class=p>:</span> <span class=nx>workload</span><span class=p>.</span><span class=nf>GetNamespace</span><span class=p>(),</span>
+</span></span><span class=line><span class=cl>		<span class=p>},</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=k>for</span> <span class=nx>_</span><span class=p>,</span> <span class=nx>target</span> <span class=o>:=</span> <span class=k>range</span> <span class=nx>workload</span><span class=p>.</span><span class=nx>Spec</span><span class=p>.</span><span class=nx>Targets</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>		<span class=nx>dr</span><span class=p>.</span><span class=nx>Spec</span><span class=p>.</span><span class=nx>Subsets</span> <span class=p>=</span> <span class=nb>append</span><span class=p>(</span><span class=nx>dr</span><span class=p>.</span><span class=nx>Spec</span><span class=p>.</span><span class=nx>Subsets</span><span class=p>,</span> <span class=o>&amp;</span><span class=nx>istionetworkingv1alpha3</span><span class=p>.</span><span class=nx>Subset</span><span class=p>{</span>
+</span></span><span class=line><span class=cl>			<span class=nx>Name</span><span class=p>:</span>   <span class=nx>target</span><span class=p>.</span><span class=nx>TrafficSplit</span><span class=p>.</span><span class=nx>Subset</span><span class=p>.</span><span class=nx>Name</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>			<span class=nx>Labels</span><span class=p>:</span> <span class=nx>target</span><span class=p>.</span><span class=nx>TrafficSplit</span><span class=p>.</span><span class=nx>Subset</span><span class=p>.</span><span class=nx>Labels</span><span class=p>,</span>
+</span></span><span class=line><span class=cl>		<span class=p>})</span>
+</span></span><span class=line><span class=cl>	<span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=nx>dr</span><span class=p>.</span><span class=nx>Spec</span><span class=p>.</span><span class=nx>Host</span> <span class=p>=</span> <span class=nx>workload</span><span class=p>.</span><span class=nx>Spec</span><span class=p>.</span><span class=nx>Host</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=k>return</span> <span class=nx>dr</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><h3 id=telling-the-controller-to-watch-the-resources-we-own>Telling the controller to &lsquo;watch&rsquo; the resources we own</h3><p>One last trick left in the implementation of our controller is, when we set the Owner references for each created <code>VirtualService</code> and <code>DestinationRule</code> in these lines:</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-go data-lang=go><span class=line><span class=cl><span class=o>...</span>
+</span></span><span class=line><span class=cl><span class=nx>err</span> <span class=p>=</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nf>SetControllerReference</span><span class=p>(</span><span class=nx>instance</span><span class=p>,</span> <span class=nx>vs</span><span class=p>,</span> <span class=nx>r</span><span class=p>.</span><span class=nx>Scheme</span><span class=p>)</span>
+</span></span><span class=line><span class=cl><span class=o>...</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=nx>err</span> <span class=o>:=</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nf>SetControllerReference</span><span class=p>(</span><span class=nx>instance</span><span class=p>,</span> <span class=nx>dr</span><span class=p>,</span> <span class=nx>r</span><span class=p>.</span><span class=nx>Scheme</span><span class=p>)</span>
+</span></span><span class=line><span class=cl><span class=o>...</span>
+</span></span></code></pre></td></tr></table></div></div><p>We are essentially telling kubernetes that these objects are &ldquo;owned&rdquo; by <em>THIS</em> controller<br>We can then ask kubernetes to send is events related to these &ldquo;OWNED&rdquo; resources whenever anything happens with them (delete/update)</p><p>To do this we go back to the end of the <a class=link href=https://github.com/ishankhare07/launchpad/blob/master/controllers/workload_controller.go target=_blank rel=noopener><code>controllers/workload_controller.go</code></a> and add the following:</p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt>1
+</span><span class=lnt>2
+</span><span class=lnt>3
+</span><span class=lnt>4
+</span><span class=lnt>5
+</span><span class=lnt>6
+</span><span class=lnt>7
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-go data-lang=go><span class=line><span class=cl><span class=kd>func</span> <span class=p>(</span><span class=nx>r</span> <span class=o>*</span><span class=nx>WorkloadReconciler</span><span class=p>)</span> <span class=nf>SetupWithManager</span><span class=p>(</span><span class=nx>mgr</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nx>Manager</span><span class=p>)</span> <span class=kt>error</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>	<span class=k>return</span> <span class=nx>ctrl</span><span class=p>.</span><span class=nf>NewControllerManagedBy</span><span class=p>(</span><span class=nx>mgr</span><span class=p>).</span>
+</span></span><span class=line><span class=cl>		<span class=nf>For</span><span class=p>(</span><span class=o>&amp;</span><span class=nx>labsv1alpha1</span><span class=p>.</span><span class=nx>Workload</span><span class=p>{}).</span>
+</span></span><span class=line><span class=cl>		<span class=nf>Owns</span><span class=p>(</span><span class=o>&amp;</span><span class=nx>istiov1alpha3</span><span class=p>.</span><span class=nx>VirtualService</span><span class=p>{}).</span>        <span class=c1>// we own both these type of objects
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=nf>Owns</span><span class=p>(</span><span class=o>&amp;</span><span class=nx>istiov1alpha3</span><span class=p>.</span><span class=nx>DestinationRule</span><span class=p>{}).</span>       <span class=c1>// hence send us events related to these
+</span></span></span><span class=line><span class=cl><span class=c1></span>		<span class=nf>Complete</span><span class=p>(</span><span class=nx>r</span><span class=p>)</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><h3 id=are-we-done>Are we done?</h3><p>One last thing. Since <code>Istio</code>&rsquo;s <code>VirtualService</code> and <code>DestinationRule</code> are external kubernetes obejcts (for which we have registered the CRD&rsquo;s while installing istio), we are still using <em>raw golang</em> objects / structs and passing it to the <a class=link href=https://github.com/kubernetes-sigs/controller-runtime target=_blank rel=noopener><code>controller-runtime</code></a> client.<br>The client needs some additional information to &ldquo;map the golang obejcts with the registered crds&rdquo;.</p><blockquote><p>Note that the golang objects we created don&rsquo;t have information like <code>apiVersion</code>, <code>kind</code>
+Hence to provide this information we need to register something called as a <code>scheme</code>.</p></blockquote><p>A Scheme basically maps the Go object to what we call GVK(<em>GroupVersionKind</em>) in kubernetes. This is usually auto generated when CRD&rsquo;s are defined using any framework like kubebuilder or operatorsdk. There&rsquo;s even one generated for our <code>Workload</code> kind which you can take a look at here – <a class=link href=https://github.com/ishankhare07/launchpad/blob/master/api/v1alpha1/groupversion_info.go target=_blank rel=noopener>api/v1alpha1/groupversion_info.go</a></p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-go data-lang=go><span class=line><span class=cl><span class=o>...</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kd>var</span> <span class=p>(</span>
+</span></span><span class=line><span class=cl>	<span class=c1>// GroupVersion is group version used to register these objects
+</span></span></span><span class=line><span class=cl><span class=c1></span>	<span class=nx>GroupVersion</span> <span class=p>=</span> <span class=nx>schema</span><span class=p>.</span><span class=nx>GroupVersion</span><span class=p>{</span><span class=nx>Group</span><span class=p>:</span> <span class=s>&#34;labs.ishankhare.dev&#34;</span><span class=p>,</span> <span class=nx>Version</span><span class=p>:</span> <span class=s>&#34;v1alpha1&#34;</span><span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=c1>// SchemeBuilder is used to add go types to the GroupVersionKind scheme
+</span></span></span><span class=line><span class=cl><span class=c1></span>	<span class=nx>SchemeBuilder</span> <span class=p>=</span> <span class=o>&amp;</span><span class=nx>scheme</span><span class=p>.</span><span class=nx>Builder</span><span class=p>{</span><span class=nx>GroupVersion</span><span class=p>:</span> <span class=nx>GroupVersion</span><span class=p>}</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl>	<span class=c1>// AddToScheme adds the types in this group-version to the given scheme.
+</span></span></span><span class=line><span class=cl><span class=c1></span>	<span class=nx>AddToScheme</span> <span class=p>=</span> <span class=nx>SchemeBuilder</span><span class=p>.</span><span class=nx>AddToScheme</span>
+</span></span><span class=line><span class=cl><span class=p>)</span>
+</span></span></code></pre></td></tr></table></div></div><p>A similar scheme is defined by the <code>Istio</code> library, which we can register in our <a class=link href=https://github.com/ishankhare07/launchpad/blob/master/main.go#L47 target=_blank rel=noopener>main.go</a></p><div class=highlight><div class=chroma><table class=lntable><tr><td class=lntd><pre tabindex=0 class=chroma><code><span class=lnt> 1
+</span><span class=lnt> 2
+</span><span class=lnt> 3
+</span><span class=lnt> 4
+</span><span class=lnt> 5
+</span><span class=lnt> 6
+</span><span class=lnt> 7
+</span><span class=lnt> 8
+</span><span class=lnt> 9
+</span><span class=lnt>10
+</span><span class=lnt>11
+</span><span class=lnt>12
+</span></code></pre></td><td class=lntd><pre tabindex=0 class=chroma><code class=language-go data-lang=go><span class=line><span class=cl><span class=kn>import</span> <span class=p>(</span>
+</span></span><span class=line><span class=cl>        <span class=o>...</span>
+</span></span><span class=line><span class=cl>        <span class=nx>istioscheme</span> <span class=s>&#34;istio.io/client-go/pkg/clientset/versioned/scheme&#34;</span>
+</span></span><span class=line><span class=cl>        <span class=o>...</span>
+</span></span><span class=line><span class=cl><span class=p>)</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=o>...</span>
+</span></span><span class=line><span class=cl>
+</span></span><span class=line><span class=cl><span class=kd>func</span> <span class=nf>init</span><span class=p>()</span> <span class=p>{</span>
+</span></span><span class=line><span class=cl>        <span class=o>...</span>
+</span></span><span class=line><span class=cl>        <span class=nx>_</span> <span class=p>=</span> <span class=nx>istioscheme</span><span class=p>.</span><span class=nf>AddToScheme</span><span class=p>(</span><span class=nx>scheme</span><span class=p>)</span>
+</span></span><span class=line><span class=cl><span class=p>}</span>
+</span></span></code></pre></td></tr></table></div></div><p>Now we are done! You can follow along the <a class=link href=https://github.com/ishankhare07/launchpad/blob/master/README.md#controller-demo target=_blank rel=noopener>Controller-demo</a> to see the magic happen!</p><h3 id=some-final-highlights>Some final highlights</h3><p>As pointed out the <a class=link href=https://github.com/ishankhare07/launchpad/blob/master/README.md#is-that-it target=_blank rel=noopener>final sections of the demo</a>, even if someone/something accidentally or deliberately deletes either of the <code>VirtualService</code> or the <code>DestinationRule</code>, the controller immediately steps in and recreates it for us.</p><blockquote><p>One more trick left to showcase. If you were to go and delete either the VirtualService or the DestinationRule now, since the controller is watching over them, it will instantly recreate it with the correct configuration. This simulates an actual human error which have triggered alerts for the team in the past only to realise that somewhere, somebody did a kubectl delete vs helloworld. Go ahead, try it. Then try to run <code>kubectl get vs,dr</code> again.</p></blockquote><p>Lastly I&rsquo;d like to mention the awesome work being done by folks at <a class=link href=https://twitter.com/crossplane_io target=_blank rel=noopener>@crossplane</a> and <a class=link href=https://twitter.com/hasheddan target=_blank rel=noopener>@hasheddan</a> who are building some really cool stuff leveraging the controllers and the KRM(kubernetes resource model). If you&rsquo;re more interested, checkout the following resources:</p><ol><li><a class=link href=https://blog.upbound.io/how-the-kubernetes-resource-model-enables-configuration-as-data/ target=_blank rel=noopener>Kubernetes as a Framework for Control Planes</a>.</li><li>Crossplane team integrating GKE Autopilot before the night ends <a class=link href="https://www.youtube.com/watch?v=3VddZSTPc4Y" target=_blank rel=noopener>on live stream</a>.</li></ol><h3 id=whats-next>What&rsquo;s next?</h3><p>In a follow-up post I&rsquo;ll talk about how we can bring <a class=link href=https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/#what-are-admission-webhooks target=_blank rel=noopener>Admission Webhooks</a>, particularly Validating Admission Webhooks into the picture and make sure nobody&rsquo;s able to create our <code>Workload</code> CRD with wrong values – like a traffic split that doesn&rsquo;t add up to a 100% for eg. (<code>80:30</code> or <code>40:30</code>)</p><p>This post was original posted on my personal blog <a class=link href=https://ishankhare.dev target=_blank rel=noopener>ishankhare.dev</a></p></section><footer class=article-footer><section class=article-tags><a href=/tags/kubernetes/>Kubernetes</a>
+<a href=/tags/controllers/>Controllers</a>
+<a href=/tags/servicemesh/>Servicemesh</a>
+<a href=/tags/golang/>Golang</a></section><section class=article-copyright><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-copyright" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><path d="M14.5 9a3.5 4 0 100 6"/></svg>
+<span>MIT</span></section><section class=article-lastmod><svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-clock" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentcolor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+<span>Last updated on Mar 02, 2021 00:00 UTC</span></section></footer></article><aside class=related-content--wrapper><h2 class=section-title>Related content</h2><div class=related-content><div class="flex article-list--tile"><article class=has-image><a href=/p/dabbling-with-envoy-configurations-part-ii/><div class=article-image><img src=/p/dabbling-with-envoy-configurations-part-ii/_hu082ecdbb90ad1c64e25ff84bfc0ff1a8_2983891_fbec8754d1d5470d489710ef286f1919.jpg width=250 height=150 loading=lazy alt="Featured image of post Dabbling with envoy - Part II" data-key=dabbling-with-envoy-configurations-part-II data-hash="md5-WIEDqN/9WYMHAZc9+s582g=="></div><div class=article-details><h2 class=article-title>Dabbling with envoy - Part II</h2></div></a></article><article class=has-image><a href=/p/dabbling-with-envoy-configurations-part-i/><div class=article-image><img src=/p/dabbling-with-envoy-configurations-part-i/cover.ab2922c12ee2c473d63c2ef426b575cf_huca0165527005b89d1a6b5500db0bdef1_3693180_250x150_fill_q75_box_smart1.jpg width=250 height=150 loading=lazy alt="Featured image of post Dabbling with Envoy configurations - Part I" data-key=dabbling-with-envoy-configurations-part-I data-hash="md5-qykiwS7ixHPWPC70JrV1zw=="></div><div class=article-details><h2 class=article-title>Dabbling with Envoy configurations - Part I</h2></div></a></article></div></div></aside><div class=disqus-container><div id=disqus_thread></div><script>window.disqus_config=function(){},function(){if(["localhost","127.0.0.1"].indexOf(window.location.hostname)!=-1){document.getElementById("disqus_thread").innerHTML="Disqus comments not available by default when the website is previewed locally.";return}var t=document,e=t.createElement("script");e.async=!0,e.src="//hugo-theme-stack.disqus.com/embed.js",e.setAttribute("data-timestamp",+new Date),(t.head||t.body).appendChild(e)}()</script><noscript>Please enable JavaScript to view the <a href=https://disqus.com/?ref_noscript>comments powered by Disqus.</a></noscript><a href=https://disqus.com class=dsq-brlink>comments powered by <span class=logo-disqus>Disqus</span></a></div><style>.disqus-container{background-color:var(--card-background);border-radius:var(--card-border-radius);box-shadow:var(--shadow-l1);padding:var(--card-padding)}</style><script>window.addEventListener("onColorSchemeChange",e=>{typeof DISQUS=="object"&&DISQUS.reset({reload:!0})})</script><footer class=site-footer><section class=copyright>&copy;
+2020 -
+2024 Ishan Khare</section><section class=powerby>Built with <a href=https://gohugo.io/ target=_blank rel=noopener>Hugo</a><br>Theme <b><a href=https://github.com/CaiJimmy/hugo-theme-stack target=_blank rel=noopener data-version=3.26.0>Stack</a></b> designed by <a href=https://jimmycai.com target=_blank rel=noopener>Jimmy</a></section></footer><div class=pswp tabindex=-1 role=dialog aria-hidden=true><div class=pswp__bg></div><div class=pswp__scroll-wrap><div class=pswp__container><div class=pswp__item></div><div class=pswp__item></div><div class=pswp__item></div></div><div class="pswp__ui pswp__ui--hidden"><div class=pswp__top-bar><div class=pswp__counter></div><button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+<button class="pswp__button pswp__button--share" title=Share></button>
+<button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+<button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button><div class=pswp__preloader><div class=pswp__preloader__icn><div class=pswp__preloader__cut><div class=pswp__preloader__donut></div></div></div></div></div><div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap"><div class=pswp__share-tooltip></div></div><button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+</button>
+<button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)"></button><div class=pswp__caption><div class=pswp__caption__center></div></div></div></div></div><script src=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js integrity="sha256-ePwmChbbvXbsO02lbM3HoHbSHTHFAeChekF1xKJdleo=" crossorigin=anonymous defer></script><script src=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js integrity="sha256-UKkzOn/w1mBxRmLLGrSeyB4e1xbrp4xylgAWb3M42pU=" crossorigin=anonymous defer></script><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.min.css crossorigin=anonymous><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css crossorigin=anonymous></main></div><script src=https://cdn.jsdelivr.net/npm/node-vibrant@3.1.6/dist/vibrant.min.js integrity="sha256-awcR2jno4kI5X0zL8ex0vi2z+KMkF24hUW8WePSA9HM=" crossorigin=anonymous></script><script type=text/javascript src=/ts/main.js defer></script><script>(function(){const e=document.createElement("link");e.href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap",e.type="text/css",e.rel="stylesheet",document.head.appendChild(e)})()</script></body></html>
