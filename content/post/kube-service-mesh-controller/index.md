@@ -33,7 +33,7 @@ This can give us a few positive outcomes:
 * Humans don't have to be on hectic on-call schedules.
 * In cases of errors, the software itself is healing the system, hence the MTTR(mean time to response) is considerably decreased.
 
-> "With great power comes great responsibilities". With all the advantages of implementing controllers, they also come with high cost of implementation details. 
+> "With great power comes great responsibilities". With all the advantages of implementing controllers, they also come with high cost of implementation details.
 > Implementing controllers is generally more complex than traditional systems.
 
 Now that we know a bit about controllers, we'll take a use case and try to implement a controller to solve it.
@@ -61,7 +61,7 @@ The use case we are trying to tackle here is doing a traffic split using a a ser
 
 The specific scenario we would want to cover is a `Traffic Split`/`Canary`. More details can be found by giving a look at this awesome example site – [istiobyexample.dev/canary](https://www.istiobyexample.dev/canary) – by [@askmeegs](https://twitter.com/askmeegs). Borrowing the following screenshot from that same article, demonstrating what we want to achieve:
 
-![Canary Deplyments](Screenshot_2021-03-02_Canary_Deployments__Istio_By_Example_.png)
+![Canary Deplyments](canary_deployments.png)
 
 The page also details how we can achieve this by creating Istio specific CRD's. We'll look at both the approaches and see the advantages first-hand where controllers come in.
 
